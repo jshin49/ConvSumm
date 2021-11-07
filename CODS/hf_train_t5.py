@@ -417,7 +417,7 @@ class T5Large(nn.Module):
 
     def convert_examples_to_features(self,
                                      examples):
-
+        config = self.generator.config
         features = []
         index = 0
         max_target_len = 0
@@ -427,11 +427,11 @@ class T5Large(nn.Module):
             # Process source information
             source = f"Summarize this dialogue : {e.context}"
             source_tokens = self.tokenizer.tokenize(source)[:self.args.source_max_len - 2]
-            source_ids = self.tokenizer.convert_tokens_to_ids(source_tokens) + [self.tokenizer.eos_token_id]  # <s> ... </s>
+            source_ids = self.tokenizer.convert_tokens_to_ids(source_tokens) + [config.eos_token_id]  # <s> ... </s>
             source_len = len(source_ids)
             source_mask = [1] * source_len
             padding_len = self.args.source_max_len - source_len
-            source_ids += ([self.tokenizer.pad_token_id] * padding_len)
+            source_ids += ([config.pad_token_id] * padding_len)
             source_mask += ([0] * padding_len)
             assert len(source_ids) == self.args.source_max_len
             assert len(source_mask) == self.args.source_max_len
@@ -460,10 +460,10 @@ class T5Large(nn.Module):
                 
             answer_tokens_ = self.tokenizer.convert_tokens_to_ids(answer_tokens)
             target_ids = answer_tokens_  # <s> ...
-            target_labels = answer_tokens_ + [self.tokenizer.eos_token_id]  # ... </s>
+            target_labels = answer_tokens_ + [config.eos_token_id]  # ... </s>
             target_len = len(target_ids)
             padding_len = self.args.target_max_len - target_len
-            target_ids += ([self.tokenizer.pad_token_id] * padding_len)
+            target_ids += ([config.pad_token_id] * padding_len)
             target_labels += ([-100] * padding_len)  # -100 is the default index to be ignored
             assert len(target_ids) == self.args.target_max_len
             assert len(target_labels) == self.args.target_max_len
@@ -655,7 +655,7 @@ class T5Large(nn.Module):
 
                 outputs = self.generator(input_ids = source_ids,
                                          attention_mask = source_mask,
-                                         decoder_input_ids = target_ids,
+                                        #  decoder_input_ids = target_ids,
                                          labels = target_labels)
 
                 loss_gen = outputs[0]
