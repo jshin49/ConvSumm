@@ -336,7 +336,7 @@ class T5Large(nn.Module):
                 if self.args.oracle_functurn_context:
                     context = "{} ".format(BOS_TOKEN) + _bos_token_.join(data["function_dialogs"]).replace("\n", " ").replace("\015", "")
                 else:
-                    context = "{} ".format(BOS_TOKEN) + _bos_token_.join(data["clean_dialog"]).replace("\n", " ").replace("\015", "")
+                    context = " ".join(data["clean_dialog"]).replace("\n", " ").replace("\015", "").strip()
 
                 func_turn_label = data["label"]
                 module_index = data["module_index"]
@@ -459,7 +459,7 @@ class T5Large(nn.Module):
                 answer_tokens = answer_tokens[:self.args.target_max_len-1] # -1 for <s> or </s>
                 
             answer_tokens_ = self.tokenizer.convert_tokens_to_ids(answer_tokens)
-            target_ids = [self.tokenizer.bos_token_id] + answer_tokens_  # <s> ...
+            target_ids = answer_tokens_  # <s> ...
             target_labels = answer_tokens_ + [self.tokenizer.eos_token_id]  # ... </s>
             target_len = len(target_ids)
             padding_len = self.args.target_max_len - target_len
@@ -470,7 +470,8 @@ class T5Large(nn.Module):
 
             # Get functional turns label (truncate to max_len), either only 0/1 or 0-6 modular index
             max_num_of_turns = 50
-            local_max_num_of_turns = source_ids.count(self.tokenizer.bos_token_id)
+            # local_max_num_of_turns = source_ids.count(self.tokenizer.bos_token_id)
+            local_max_num_of_turns = 0
             if self.args.add_module_loss:
                 func_turn_label = []
                 counter = 0
@@ -625,8 +626,8 @@ class T5Large(nn.Module):
                 target_ids, target_labels, func_labels = item_dict["target_ids"], item_dict["target_labels"], item_dict[
                     "func_label"]
 
-                encoder_outputs, source_mask = self.encode(source_ids, source_mask)
-                batch_size = encoder_outputs.size(0)
+                # encoder_outputs, source_mask = self.encode(source_ids, source_mask)
+                batch_size = len(source_ids)
 
                 if self.args.add_functurn_loss or self.args.add_module_loss:
                     sent_repr_mat = []
@@ -652,16 +653,10 @@ class T5Large(nn.Module):
                     if self.args.wandb and step % 50 == 0:
                         wandb.log({'avg_training_loss_functurn': np.mean(train_loss_tracker_func)})
 
-                outputs = self.generator(input_ids=None,
-                                         attention_mask=source_mask,
-                                         encoder_outputs=(encoder_outputs,),
-                                         decoder_input_ids=target_ids,
-                                         labels=target_labels)
-
-                # outputs = self.generator(input_ids = source_ids,
-                #                          attention_mask = source_mask,
-                #                          decoder_input_ids = target_ids,
-                #                          labels = target_labels)
+                outputs = self.generator(input_ids = source_ids,
+                                         attention_mask = source_mask,
+                                         decoder_input_ids = target_ids,
+                                         labels = target_labels)
 
                 loss_gen = outputs[0]
                 # encoder_outputs = outputs[2]
