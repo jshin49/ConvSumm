@@ -99,18 +99,18 @@ class InputFeatures:
                  source_ids,
                  source_mask,
                  source_len,
-                 target_ids,
+                #  target_ids,
                  target_labels,
-                 target_len,
+                #  target_len,
                  func_turn_label):
         self.ID = ID
         self.example_index = example_index
         self.source_ids = source_ids
         self.source_mask = source_mask
         self.source_len = source_len
-        self.target_ids = target_ids
+        # self.target_ids = target_ids
         self.target_labels = target_labels
-        self.target_len = target_len
+        # self.target_len = target_len
         self.func_turn_label = func_turn_label
         
 
@@ -139,9 +139,9 @@ class CDataset(torch.utils.data.Dataset):
                 "source_ids": self.all_source_ids[idx],
                 "source_mask": self.all_source_mask[idx],
                 "source_len": self.all_source_len[idx],
-                "target_ids": self.all_target_ids[idx],
+                # "target_ids": self.all_target_ids[idx],
                 "target_labels": self.all_target_labels[idx],
-                "target_len": self.all_target_len[idx],
+                # "target_len": self.all_target_len[idx],
                 "func_label": self.all_func_label[idx],
             }
         else:
@@ -455,14 +455,15 @@ class T5Large(nn.Module):
             
             else:
                 answer_tokens = self.tokenizer(
-                    e.summar,
+                    e.summary,
                     padding=True,
                     return_tensors=None, # non-padded return List[List[Int]]
                     return_attention_mask=False,
                     truncation=True,
                     max_length=max_target_len,
                 ).input_ids
-                answer_tokens.masked_fill_(answer_tokens == -100, config.pad_token_id)
+                answer_tokens = [(t if t != config.pad_token_id else -100) for t in answer_tokens]
+                # answer_tokens.masked_fill_(answer_tokens == -100, config.pad_token_id)
             #     answer_tokens = self.tokenizer.tokenize(e.summary)
             #     if len(answer_tokens) > max_target_len: max_target_len = len(answer_tokens)
             #     answer_tokens = answer_tokens[:self.args.target_max_len-1] # -1 for <s> or </s>
@@ -548,13 +549,13 @@ class T5Large(nn.Module):
         # batch = tuple(t.to(self.device) for t in batch)
         source_ids = batch["source_ids"][:, :batch_source_max_len].to(self.device)
         source_mask = batch["source_mask"][:, :batch_source_max_len].to(self.device)
-        target_ids = batch["target_ids"][:, :batch_target_max_len].to(self.device)
+        # target_ids = batch["target_ids"][:, :batch_target_max_len].to(self.device)
         target_labels = batch["target_labels"][:, :batch_target_max_len].contiguous().to(self.device)
         item = {
             "ID": batch["ID"],
             "source_ids": source_ids,
             "source_mask": source_mask,
-            "target_ids": target_ids,
+            # "target_ids": target_ids,
             "target_labels": target_labels,
             "func_label": batch["func_label"],
         }
@@ -632,8 +633,7 @@ class T5Large(nn.Module):
                 loss = 0
                 item_dict = self.get_train_batch_data(batch)
                 source_ids, source_mask = item_dict["source_ids"], item_dict["source_mask"]
-                target_ids, target_labels, func_labels = item_dict["target_ids"], item_dict["target_labels"], item_dict[
-                    "func_label"]
+                target_labels, func_labels = item_dict["target_labels"], item_dict["func_label"]
 
                 # encoder_outputs, source_mask = self.encode(source_ids, source_mask)
                 batch_size = len(source_ids)
