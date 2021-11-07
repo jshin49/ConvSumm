@@ -459,7 +459,7 @@ class T5Large(nn.Module):
                 # answer_tokens = answer_tokens[:self.args.target_max_len-1] # -1 for <s> or </s>
                 
             answer_tokens = self.tokenizer.convert_tokens_to_ids(answer_tokens)
-            target_labels = answer_tokens + [config.eos_token_id] # ... </s>
+            answer_tokens = answer_tokens + [config.eos_token_id] # ... </s>
             target_ids = [config.bos_token_id] + answer_tokens # <s> ...
             target_len = len(target_ids)
 
