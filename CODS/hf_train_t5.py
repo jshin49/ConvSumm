@@ -124,9 +124,9 @@ class CDataset(torch.utils.data.Dataset):
         self.all_source_ids = torch.tensor([f.source_ids for f in features], dtype=torch.long)
         self.all_source_mask = torch.tensor([f.source_mask for f in features], dtype=torch.long)
         self.all_source_len = torch.tensor([f.source_len for f in features], dtype=torch.long)
-        self.all_target_ids = torch.tensor([f.target_ids for f in features], dtype=torch.long)
+        # self.all_target_ids = torch.tensor([f.target_ids for f in features], dtype=torch.long)
         self.all_target_labels = torch.tensor([f.target_labels for f in features], dtype=torch.long)
-        self.all_target_len = torch.tensor([f.target_len for f in features], dtype=torch.long)
+        # self.all_target_len = torch.tensor([f.target_len for f in features], dtype=torch.long)
         self.all_func_label = torch.tensor([f.func_turn_label for f in features], dtype=torch.long)
         
     def __len__(self):
@@ -420,7 +420,7 @@ class T5Large(nn.Module):
         config = self.generator.config
         features = []
         index = 0
-        max_target_len = 0
+        max_target_len = 500
 
         for e in tqdm(examples, desc='Examples'):
 
@@ -454,19 +454,28 @@ class T5Large(nn.Module):
                 answer_tokens = answer_tokens[-self.args.target_max_len+1:] # -1 for <s> or </s>
             
             else:
-                answer_tokens = self.tokenizer.tokenize(e.summary)
-                if len(answer_tokens) > max_target_len: max_target_len = len(answer_tokens)
-                answer_tokens = answer_tokens[:self.args.target_max_len-1] # -1 for <s> or </s>
+                answer_tokens = self.tokenizer(
+                    e.summar,
+                    padding=True,
+                    return_tensors=None, # non-padded return List[List[Int]]
+                    return_attention_mask=False,
+                    truncation=True,
+                    max_length=max_target_len,
+                ).input_ids
+                answer_tokens.masked_fill_(answer_tokens == -100, config.pad_token_id)
+            #     answer_tokens = self.tokenizer.tokenize(e.summary)
+            #     if len(answer_tokens) > max_target_len: max_target_len = len(answer_tokens)
+            #     answer_tokens = answer_tokens[:self.args.target_max_len-1] # -1 for <s> or </s>
                 
-            answer_tokens_ = self.tokenizer.convert_tokens_to_ids(answer_tokens)
-            target_ids = answer_tokens_  # <s> ...
-            target_labels = answer_tokens_ + [config.eos_token_id]  # ... </s>
-            target_len = len(target_ids)
-            padding_len = self.args.target_max_len - target_len
-            target_ids += ([config.pad_token_id] * padding_len)
-            target_labels += ([-100] * padding_len)  # -100 is the default index to be ignored
-            assert len(target_ids) == self.args.target_max_len
-            assert len(target_labels) == self.args.target_max_len
+            # answer_tokens_ = self.tokenizer.convert_tokens_to_ids(answer_tokens)
+            # target_ids = answer_tokens_  # <s> ...
+            # target_labels = answer_tokens_ + [config.eos_token_id]  # ... </s>
+            # target_len = len(target_ids)
+            # padding_len = self.args.target_max_len - target_len
+            # target_ids += ([config.pad_token_id] * padding_len)
+            # target_labels += ([-100] * padding_len)  # -100 is the default index to be ignored
+            # assert len(target_ids) == self.args.target_max_len
+            # assert len(target_labels) == self.args.target_max_len
 
             # Get functional turns label (truncate to max_len), either only 0/1 or 0-6 modular index
             max_num_of_turns = 50
@@ -492,7 +501,7 @@ class T5Large(nn.Module):
             padding_len = max_num_of_turns - local_max_num_of_turns
             func_turn_label += ([-1] * padding_len)
 
-            f = InputFeatures(e.ID, index, source_ids, source_mask, source_len, target_ids, target_labels, target_len,
+            f = InputFeatures(e.ID, index, source_ids, source_mask, source_len, answer_tokens,
                               func_turn_label)
             features.append(f)
 
@@ -655,7 +664,6 @@ class T5Large(nn.Module):
 
                 outputs = self.generator(input_ids = source_ids,
                                          attention_mask = source_mask,
-                                        #  decoder_input_ids = target_ids,
                                          labels = target_labels)
 
                 loss_gen = outputs[0]
