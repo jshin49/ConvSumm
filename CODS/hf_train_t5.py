@@ -460,8 +460,7 @@ class T5Large(nn.Module):
                 
             answer_tokens = self.tokenizer.convert_tokens_to_ids(answer_tokens)
             answer_tokens = answer_tokens + [config.eos_token_id] # ... </s>
-            target_ids = [config.bos_token_id] + answer_tokens # <s> ...
-            target_len = len(target_ids)
+            target_len = len(answer_tokens)
 
             padding_len = self.args.target_max_len - target_len
             answer_tokens += ([-100] * padding_len) # -100 is the default index to be ignored
