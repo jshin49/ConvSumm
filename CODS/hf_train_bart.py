@@ -6,7 +6,10 @@ For full license text, see the LICENSE file in the repo root or https://opensour
 '''
 
 from transformers import BartForConditionalGeneration, BartTokenizer, AdamW, get_linear_schedule_with_warmup
-
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSeq2SeqLM,
+)
 import torch
 from torch.utils.data import TensorDataset, DataLoader, RandomSampler, SequentialSampler
 import torch.nn.functional as F
@@ -79,13 +82,14 @@ class InputExample:
                  summary,
                  func_turn_label,
                  module_index,
-                 key_phrases):
+                #  key_phrases
+                ):
         self.ID = ID
         self.context = context
         self.summary = summary
         self.func_turn_label = func_turn_label
         self.module_index = module_index
-        self.key_phrases = key_phrases
+        # self.key_phrases = key_phrases
 
 class InputFeatures:
     def __init__(self,
@@ -160,11 +164,11 @@ class Bart(nn.Module):
         self.cpu = torch.device("cpu")
 
         if self.args.load_path:
-            self.generator = BartForConditionalGeneration.from_pretrained(self.args.model_name, state_dict = torch.load(self.args.load_path))
+            self.generator = AutoModelForSeq2SeqLM.from_pretrained(self.args.model_name, state_dict = torch.load(self.args.load_path))
         else:
-            self.generator = BartForConditionalGeneration.from_pretrained(self.args.model_name)
+            self.generator = AutoModelForSeq2SeqLM.from_pretrained(self.args.model_name)
         self.generator.to(self.device)
-        self.tokenizer = BartTokenizer.from_pretrained(self.args.model_name) # Need to add base to "tokenization_bart.py" when using transformers==2.11.0
+        self.tokenizer = AutoTokenizer.from_pretrained(self.args.model_name) # Need to add base to "tokenization_bart.py" when using transformers==2.11.0
         
         if self.args.add_module_loss:
             self.classifier = nn.Linear(self.generator.model.config.d_model, 7)
@@ -334,7 +338,7 @@ class Bart(nn.Module):
 
                 func_turn_label = data["label"]
                 module_index = data["module_index"]
-                key_phrases = data["key_phrases"]
+                # key_phrases = data["key_phrases"]
 
                 if self.args.do_segment:
                     
@@ -391,7 +395,8 @@ class Bart(nn.Module):
                                      summary=summary,
                                      func_turn_label=func_turn_label,
                                      module_index=module_index,
-                                     key_phrases=key_phrases)
+                                    #  key_phrases=key_phrases
+                                     )
                     examples.append(e)
         
         print()
@@ -401,7 +406,7 @@ class Bart(nn.Module):
         print("examples[0].summary", examples[0].summary)
         print("examples[0].func_turn_label", examples[0].func_turn_label)
         print("examples[0].module_index", examples[0].module_index)
-        print("examples[0].key_phrases", examples[0].key_phrases)
+        # print("examples[0].key_phrases", examples[0].key_phrases)
         print()
         
         return examples
@@ -632,7 +637,7 @@ class Bart(nn.Module):
                     loss_functurn = F.cross_entropy(prediction_logits.reshape(-1, prediction_logits.size(-1)), \
                                                     func_labels.reshape(-1), ignore_index=-1, reduction='mean')
                     loss += loss_functurn * self.args.weight_addition_loss
-                    
+
                     train_loss_tracker_func.append(loss_functurn.item())
                     if self.args.wandb and step % 50 == 0:
                         wandb.log({'avg_training_loss_functurn': np.mean(train_loss_tracker_func)})
@@ -720,7 +725,7 @@ class Bart(nn.Module):
                 # encoder_outputs, source_mask = self.encode(source_ids, source_mask)
                 
                 no_repeat_ngram_size = self.args.no_repeat_ngram_size
-                    
+
                 target_ids = self.generator.generate(input_ids = source_ids, attention_mask = source_mask,
                                                      num_beams = self.args.beam,
                                                      max_length = self.args.test_target_max_len,
@@ -799,8 +804,8 @@ if __name__ == '__main__':
     if model.args.do_train:
         print("[INFO] Start training ...") 
         model.train()
-        model.generator = BartForConditionalGeneration.from_pretrained(model.args.model_name, state_dict = torch.load(os.path.join(model.args.output_dir, "pytorch.bin"))) 
-        model.generator.to(model.device)
+        # model.generator = BartForConditionalGeneration.from_pretrained(model.args.model_name, state_dict = torch.load(os.path.join(model.args.output_dir, "pytorch.bin"))) 
+        # model.generator.to(model.device)
     else:
         if model.args.load_path == "":
             print("[ERROR] No trained model specified...")
