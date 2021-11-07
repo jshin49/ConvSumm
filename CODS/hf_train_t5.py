@@ -101,7 +101,7 @@ class InputFeatures:
                  source_len,
                 #  target_ids,
                  target_labels,
-                #  target_len,
+                 target_len,
                  func_turn_label):
         self.ID = ID
         self.example_index = example_index
@@ -110,7 +110,7 @@ class InputFeatures:
         self.source_len = source_len
         # self.target_ids = target_ids
         self.target_labels = target_labels
-        # self.target_len = target_len
+        self.target_len = target_len
         self.func_turn_label = func_turn_label
         
 
@@ -126,7 +126,7 @@ class CDataset(torch.utils.data.Dataset):
         self.all_source_len = torch.tensor([f.source_len for f in features], dtype=torch.long)
         # self.all_target_ids = torch.tensor([f.target_ids for f in features], dtype=torch.long)
         self.all_target_labels = torch.tensor([f.target_labels for f in features], dtype=torch.long)
-        # self.all_target_len = torch.tensor([f.target_len for f in features], dtype=torch.long)
+        self.all_target_len = torch.tensor([f.target_len for f in features], dtype=torch.long)
         self.all_func_label = torch.tensor([f.func_turn_label for f in features], dtype=torch.long)
         
     def __len__(self):
@@ -141,7 +141,7 @@ class CDataset(torch.utils.data.Dataset):
                 "source_len": self.all_source_len[idx],
                 # "target_ids": self.all_target_ids[idx],
                 "target_labels": self.all_target_labels[idx],
-                # "target_len": self.all_target_len[idx],
+                "target_len": self.all_target_len[idx],
                 "func_label": self.all_func_label[idx],
             }
         else:
@@ -458,9 +458,12 @@ class T5Large(nn.Module):
                 if len(answer_tokens) > max_target_len: max_target_len = len(answer_tokens)
                 # answer_tokens = answer_tokens[:self.args.target_max_len-1] # -1 for <s> or </s>
                 
-            # answer_tokens_ = self.tokenizer.convert_tokens_to_ids(answer_tokens)
-            # target_labels = answer_tokens_ + [config.eos_token_id] # ... </s>
-            padding_len = self.args.target_max_len - len(answer_tokens)
+            answer_tokens = self.tokenizer.convert_tokens_to_ids(answer_tokens)
+            target_labels = answer_tokens + [config.eos_token_id] # ... </s>
+            target_ids = [config.bos_token_id] + answer_tokens # <s> ...
+            target_len = len(target_ids)
+
+            padding_len = self.args.target_max_len - target_len
             answer_tokens += ([-100] * padding_len) # -100 is the default index to be ignored
             assert len(answer_tokens) == self.args.target_max_len
             
@@ -488,7 +491,7 @@ class T5Large(nn.Module):
             padding_len = max_num_of_turns - local_max_num_of_turns
             func_turn_label += ([-1] * padding_len)
 
-            f = InputFeatures(e.ID, index, source_ids, source_mask, source_len, answer_tokens,
+            f = InputFeatures(e.ID, index, source_ids, source_mask, source_len, answer_tokens, target_len,
                               func_turn_label)
             features.append(f)
 
